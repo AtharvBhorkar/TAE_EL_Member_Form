@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react"; // useRef add kiya
 import { motion, AnimatePresence } from "framer-motion";
+import emailjs from "@emailjs/browser"; // EmailJS import kiya
 
 const OPTIONS = [
   { id: "oop", tag: "TAE", title: "Movie Ticket Planner", sub: "TAE OOP · Topic #9", icon: "🎬" },
@@ -130,6 +131,9 @@ export default function App() {
   const [errors, setErrors] = useState({});
   const [done, setDone] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
+  const [isSending, setIsSending] = useState(false); // Loading state add ki
+
+  const formRef = useRef(); // Form Ref banaya
 
   const set = (key) => (value) => {
     if (key === "mobile") value = value.replace(/\D/g, "").slice(0, 10);
@@ -148,14 +152,43 @@ export default function App() {
     setErrors(er);
 
     if (Object.keys(er).length === 0) {
-      console.log("Application:", form);
-      setCelebrate(true);
-      setTimeout(() => setCelebrate(false), 4200);
-      setDone(true);
+      setIsSending(true);
+
+      // Chuna hua option dhoondhne ke liye
+      const chosen = OPTIONS.find((o) => o.id === form.pick);
+      
+      const templateParams = {
+        from_name: form.name,
+        mobile: form.mobile,
+        email: form.email,
+        why: form.why,
+        pick: chosen ? `${chosen.title} (${chosen.tag})` : form.pick, 
+      };
+
+      // EMAIL JS CODE
+      emailjs
+        .send(
+          "service_yzwxzwi",     // Service ID
+          "template_lrylacm",    // Template ID
+          templateParams,
+          "RKjYcDsWHpsLMXTZ0"    // Public Key
+        )
+        .then((response) => {
+          console.log("SUCCESS!", response.status, response.text);
+          setCelebrate(true);
+          setTimeout(() => setCelebrate(false), 4200);
+          setDone(true);
+          setIsSending(false);
+        })
+        .catch((err) => {
+          console.log("FAILED...", err);
+          alert("Email bhejne mein error aayi. Kripya internet check karein ya baad mein try karein.");
+          setIsSending(false);
+        });
     }
   };
 
-  const chosen = OPTIONS.find((o) => o.id === form.pick);
+  const chosenOption = OPTIONS.find((o) => o.id === form.pick);
   const isValid =
     form.name.trim().length >= 3 &&
     /^[6-9]\d{9}$/.test(form.mobile) &&
@@ -164,7 +197,6 @@ export default function App() {
     !!form.pick;
 
   return (
-    // min-h-[100dvh] is used for better mobile height handling (iOS Safari toolbars)
     <div className="relative min-h-[100dvh] w-full flex items-center justify-center px-3 py-6 sm:px-6 sm:py-10 overflow-hidden">
       <div className="blob b1" /><div className="blob b2" /><div className="blob b3" />
       <AnimatePresence>{celebrate && <Celebration key="celebration" />}</AnimatePresence>
@@ -179,6 +211,7 @@ export default function App() {
           <AnimatePresence mode="wait">
             {!done ? (
               <motion.form
+                ref={formRef} // Ref add kiya
                 key="form" noValidate onSubmit={handleSubmit}
                 variants={container} initial="hidden" animate="show" exit={{ opacity: 0, x: -30 }}
                 className="space-y-3 sm:space-y-4"
@@ -235,8 +268,14 @@ export default function App() {
                 </motion.div>
 
                 <motion.div variants={item} className="pt-2">
-                  <motion.button type="submit" className={`btn w-full py-3 sm:py-4 text-sm sm:text-base font-semibold ${isValid ? "" : "opacity-60"}`} whileHover={{ scale: 1.02, y: -2 }} whileTap={{ scale: 0.97 }}>
-                    Submit Application 🚀
+                  <motion.button 
+                    type="submit" 
+                    disabled={isSending}
+                    className={`btn w-full py-3 sm:py-4 text-sm sm:text-base font-semibold ${isValid && !isSending ? "" : "opacity-60"}`} 
+                    whileHover={isValid && !isSending ? { scale: 1.02, y: -2 } : {}} 
+                    whileTap={isValid && !isSending ? { scale: 0.97 } : {}}
+                  >
+                    {isSending ? "Sending... ⏳" : "Submit Application 🚀"}
                   </motion.button>
                 </motion.div>
               </motion.form>
@@ -256,11 +295,13 @@ export default function App() {
                   <p>🧑 <span className="font-medium">{form.name}</span></p>
                   <p>📱 {form.mobile}</p>
                   <p>✉️ {form.email}</p>
-                  <p className="flex flex-wrap items-center gap-1">
-                    <span>{chosen.icon}</span>
-                    <span className="font-medium">{chosen.title}</span>
-                    <span className="text-[10px] sm:text-xs" style={{ color: "var(--muted)" }}>({chosen.sub})</span>
-                  </p>
+                  {chosenOption && (
+                    <p className="flex flex-wrap items-center gap-1">
+                      <span>{chosenOption.icon}</span>
+                      <span className="font-medium">{chosenOption.title}</span>
+                      <span className="text-[10px] sm:text-xs" style={{ color: "var(--muted)" }}>({chosenOption.sub})</span>
+                    </p>
+                  )}
                 </div>
                 <button className="btn mt-5 sm:mt-6 w-full py-3 text-sm sm:text-base" onClick={() => { setDone(false); setForm(EMPTY); setErrors({}); }}>
                   Nayi application bharein
